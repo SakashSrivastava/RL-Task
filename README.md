@@ -65,7 +65,7 @@ Other options: `--chrome`, `--site`, `--delay_p`.
 
 ## Results and observations
 
-The committed `logs/` and `report.md` come from the run shown in the video. Headline numbers:
+The committed `logs/` and `report.md` come from the same run, so every number below can be checked against the logs. The video shows the report from an earlier run of the same code. The headline results are identical; only timing numbers differ slightly between runs. Headline numbers:
 
 | | result |
 |---|---|
@@ -103,7 +103,7 @@ Observations:
 | `env/src/agents.hpp` | Random agent and Q-learning agent |
 | `env/src/main.cpp` | Command line, train and test loops, Chrome restart on failure, Ctrl+C handling |
 | `analysis/report.py` | Reads `logs/` and writes `report.md` |
-| `logs/` | Evaluation logs from the run shown in the video, plus the trained Q-tables |
+| `logs/` | Evaluation logs behind `report.md`, plus the trained Q-tables |
 | `report.md`, `report_files/` | Generated report and charts |
 | `DECISIONS.md` | State, actions, reward, episode end, what was skipped |
 
