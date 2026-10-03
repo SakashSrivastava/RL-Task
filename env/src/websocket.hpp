@@ -84,7 +84,7 @@ private:
         while (got < n) {
             int ms = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();
             pollfd p{fd_, POLLIN, 0};
-            if (ms <= 0 || poll(&p, 1, ms) == 0) throw Timeout("timed out waiting for Chrome");
+            if (ms <= 0 || poll(&p, 1, ms) <= 0) throw Timeout("timed out waiting for Chrome");
             ssize_t k = recv(fd_, &out[got], n - got, 0);
             if (k <= 0) throw std::runtime_error("connection closed");
             got += k;
