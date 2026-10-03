@@ -54,7 +54,7 @@ int run(int argc, char** argv) {
             const Task& task = tasks[ep % tasks.size()];
             int pageSeed = (training ? 0 : 1000000) + runSeed * 100000 + ep;
             try {
-                successes += runEpisode(*env, agent, task, pageSeed, ep, meta, log).success();
+                successes += runEpisode(*env, agent, task, pageSeed, ep, meta, log) == "success";
             } catch (const std::exception& e) {
                 std::cerr << "episode " << ep << " failed (" << e.what() << "), restarting Chrome\n";
                 startChrome();

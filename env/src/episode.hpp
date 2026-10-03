@@ -2,23 +2,17 @@
 #include <fstream>
 #include "minishop_env.hpp"
 
-struct EpisodeResult {
-    std::string reason;
-    int steps = 0;
-    double totalReward = 0;
-    bool success() const { return reason == "success"; }
-};
-
 template <class Agent>
-EpisodeResult runEpisode(MiniShopEnv& env, Agent& agent, const Task& task, int seed, int episode,
-                         const json& meta, std::ofstream& log) {
+std::string runEpisode(MiniShopEnv& env, Agent& agent, const Task& task, int seed, int episode,
+                       const json& meta, std::ofstream& log) {
+    auto start = Clock::now();
     Observation obs = env.reset(task, seed);
-    EpisodeResult result;
+    double resetMs = msBetween(start, Clock::now());
     for (int step = 1;; step++) {
         int action = agent.act(obs);
         auto t0 = Clock::now();
         StepResult r = env.step(action);
-        double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+        double ms = msBetween(t0, Clock::now());
         agent.learn(obs, action, r);
 
         json line = meta;
@@ -32,17 +26,15 @@ EpisodeResult runEpisode(MiniShopEnv& env, Agent& agent, const Task& task, int s
         line["done"] = r.done;
         line["truncated"] = r.truncated;
         line["ms"] = ms;
+        if (step == 1) line["reset_ms"] = resetMs;
         line["popup"] = obs.popup;
         line["info"] = r.info;
         log << line.dump() << "\n";
 
-        result.steps = step;
-        result.totalReward += r.reward;
         obs = r.obs;
         if (r.done || r.truncated) {
             agent.endEpisode();
-            result.reason = r.info.value("reason", "unknown");
-            return result;
+            return r.info.value("reason", "unknown");
         }
     }
 }

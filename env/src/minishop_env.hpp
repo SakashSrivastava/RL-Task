@@ -39,6 +39,10 @@ struct StepResult {
 constexpr int WAIT = -1;
 inline std::string actionName(int a) { return a == WAIT ? "wait" : "click(" + std::to_string(a) + ")"; }
 
+inline double msBetween(Clock::time_point a, Clock::time_point b) {
+    return std::chrono::duration<double, std::milli>(b - a).count();
+}
+
 const char* OBSERVE_JS = R"JS((() => {
   const buttons = [...document.querySelectorAll('button')]
     .filter(b => b.getClientRects().length > 0)
@@ -119,10 +123,6 @@ private:
     Observation obs_;
     int steps_ = 0;
     bool ended_ = true;
-
-    static double msBetween(Clock::time_point a, Clock::time_point b) {
-        return std::chrono::duration<double, std::milli>(b - a).count();
-    }
 
     json eval(const std::string& js, Clock::time_point deadline) {
         json r = browser_.call("Runtime.evaluate", {{"expression", js}, {"returnByValue", true}}, deadline);
