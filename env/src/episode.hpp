@@ -9,7 +9,6 @@ struct EpisodeResult {
     bool success() const { return reason == "success"; }
 };
 
-// One attempt: reset, then act until done/truncated. Writes one JSON line per step.
 template <class Agent>
 EpisodeResult runEpisode(MiniShopEnv& env, Agent& agent, const Task& task, int seed, int episode,
                          const json& meta, std::ofstream& log) {
@@ -41,6 +40,7 @@ EpisodeResult runEpisode(MiniShopEnv& env, Agent& agent, const Task& task, int s
         result.totalReward += r.reward;
         obs = r.obs;
         if (r.done || r.truncated) {
+            agent.endEpisode();
             result.reason = r.info.value("reason", "unknown");
             return result;
         }

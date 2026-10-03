@@ -1,8 +1,8 @@
 #include <atomic>
+#include <cmath>
 #include <csignal>
 #include <filesystem>
 #include <iostream>
-#include <map>
 #include "agents.hpp"
 #include "episode.hpp"
 
@@ -17,8 +17,9 @@ std::vector<Task> allTasks() {
 
 std::map<std::string, std::string> parseArgs(int argc, char** argv) {
     std::map<std::string, std::string> args = {
-        {"chrome", "google-chrome"}, {"site", "site/index.html"}, {"episodes", "24"}, {"seed", "0"},
-        {"popup_p", "0.15"}, {"delay_p", "0.10"}, {"log", "logs/demo.jsonl"}};
+        {"mode", "train"}, {"agent", "q"}, {"chrome", "google-chrome"}, {"site", "site/index.html"},
+        {"episodes", "240"}, {"seed", "0"}, {"popup_p", "0.15"}, {"delay_p", "0.10"},
+        {"log", "logs/train_0.jsonl"}, {"qtable", "logs/qtable_0.json"}};
     for (int i = 1; i + 1 < argc; i += 2) args[std::string(argv[i]).substr(2)] = argv[i + 1];
     return args;
 }
@@ -28,39 +29,58 @@ int run(int argc, char** argv) {
     std::signal(SIGINT, [](int) { stopRequested = true; });
     std::signal(SIGTERM, [](int) { stopRequested = true; });
 
+    bool training = args["mode"] == "train";
     std::string pageUrl = "file://" + std::filesystem::absolute(args["site"]).string();
     double popupP = std::stod(args["popup_p"]), delayP = std::stod(args["delay_p"]);
     int runSeed = std::stoi(args["seed"]), episodes = std::stoi(args["episodes"]);
 
     std::filesystem::create_directories(std::filesystem::path(args["log"]).parent_path());
     std::ofstream log(args["log"]);
-    json meta = {{"agent", "random"}, {"run", runSeed}, {"popup_p", popupP}, {"delay_p", delayP}};
+    json meta = {{"mode", args["mode"]}, {"agent", args["agent"]}, {"run", runSeed}, {"popup_p", popupP}, {"delay_p", delayP}};
 
     std::unique_ptr<Browser> browser;
     std::unique_ptr<MiniShopEnv> env;
     auto startChrome = [&] {
         env = nullptr;
-        browser =std::make_unique<Browser>(args["chrome"]);
+        browser = std::make_unique<Browser>(args["chrome"]);
         env = std::make_unique<MiniShopEnv>(*browser, pageUrl, popupP, delayP);
     };
     startChrome();
 
-    RandomAgent agent(runSeed);
     auto tasks = allTasks();
-    int successes = 0;
-    for (int ep = 0; ep < episodes && !stopRequested; ep++) {
-        const Task& task = tasks[ep % tasks.size()];
-        int pageSeed = runSeed * 100000 + ep;
-        try {
-            EpisodeResult r = runEpisode(*env, agent, task, pageSeed, ep, meta, log);
-            successes += r.success();
-            std::cout << "episode " << ep << "  " << task.goal() << "  -> " << r.reason << " in " << r.steps << " steps\n";
-        } catch (const std::exception& e) {
-            std::cerr << "episode " << ep << " failed (" << e.what() << "), restarting Chrome\n";
-            startChrome();
+    auto runAll = [&](auto& agent) {
+        int successes = 0;
+        for (int ep = 0; ep < episodes && !stopRequested; ep++) {
+            const Task& task = tasks[ep % tasks.size()];
+            int pageSeed = (training ? 0 : 1000000) + runSeed * 100000 + ep;
+            try {
+                successes += runEpisode(*env, agent, task, pageSeed, ep, meta, log).success();
+            } catch (const std::exception& e) {
+                std::cerr << "episode " << ep << " failed (" << e.what() << "), restarting Chrome\n";
+                startChrome();
+            }
+            if ((ep + 1) % 100 == 0) std::cout << "  " << ep + 1 << "/" << episodes << " episodes\n";
         }
+        std::cout << args["mode"] << " " << args["agent"] << " run " << runSeed << " popup_p " << popupP << ": "
+                  << successes << "/" << episodes << " successes\n";
+    };
+
+    if (args["agent"] == "random") {
+        RandomAgent agent(runSeed);
+        runAll(agent);
+        return 0;
     }
-    std::cout << successes << " successes, log written to " << args["log"] << "\n";
+    QAgent agent(runSeed);
+    if (training) {
+        agent.epsilonDecay = std::pow(agent.epsilonMin, 1.0 / (0.8 * episodes));
+        runAll(agent);
+        agent.save(args["qtable"]);
+    } else {
+        agent.load(args["qtable"]);
+        agent.epsilon = 0;
+        agent.learning = false;
+        runAll(agent);
+    }
     return 0;
 }
 

@@ -39,7 +39,6 @@ struct StepResult {
 constexpr int WAIT = -1;
 inline std::string actionName(int a) { return a == WAIT ? "wait" : "click(" + std::to_string(a) + ")"; }
 
-// Runs inside the page: every visible <button>, its centre, and whether a real click there would hit it.
 const char* OBSERVE_JS = R"JS((() => {
   const buttons = [...document.querySelectorAll('button')]
     .filter(b => b.getClientRects().length > 0)
@@ -138,9 +137,7 @@ private:
                 if (eval(check, deadline) == true) return;
             } catch (const Timeout&) {
                 throw;
-            } catch (const std::runtime_error&) {
-                // the old page can vanish mid-call while navigating; just ask again
-            }
+            } catch (const std::runtime_error&) {}
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
